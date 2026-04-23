@@ -162,7 +162,7 @@ func (t *TNC) enqueue(port uint8, data []byte) {
 // dropping the oldest queued command when the queue is full.
 func (t *TNC) enqueueCommand(port uint8, data []byte) {
 	// Drop the oldest pending command to preserve a bounded queue size.
-	if t.ports[port].free() == 0 {
+	if t.ports[port].cmdFree() == 0 {
 		<-t.ports[port].cmdQueue
 	}
 
@@ -216,6 +216,11 @@ func (p *port) Write(data []byte) (n int, err error) {
 // free returns the remaining capacity in the port's data queue.
 func (p *port) free() int {
 	return cap(p.queue) - len(p.queue)
+}
+
+// free returns the remaining capacity in the port's data queue.
+func (p *port) cmdFree() int {
+	return cap(p.cmdQueue) - len(p.cmdQueue)
 }
 
 // Read copies the next queued command frame into data and returns the full
