@@ -130,10 +130,10 @@ func (t *TNC) enqueueCommand(port uint8, data []byte) {
 	// first check how much space we have left:
 	if t.ports[port].free() == 0 {
 		// discard one
-		<-t.ports[port].queue
+		<-t.ports[port].cmdQueue
 	}
 
-	t.ports[port].queue <- data
+	t.ports[port].cmdQueue <- data
 }
 
 func (t *TNC) IsClosed() bool {
