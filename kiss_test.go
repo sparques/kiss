@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net"
 	"testing"
+	"time"
 )
 
 func TestFrameEncodeDoesNotPrependZeros(t *testing.T) {
@@ -69,6 +71,75 @@ func TestPortWriteReportsShortWrite(t *testing.T) {
 	}
 	if n != 0 {
 		t.Fatalf("n = %d, want 0", n)
+	}
+}
+
+func TestSetHardwareFrameRoundTrip(t *testing.T) {
+	left, right := net.Pipe()
+	t.Cleanup(func() { _ = left.Close() })
+	t.Cleanup(func() { _ = right.Close() })
+
+	sender := NewTNC(left)
+	receiver := NewTNC(right)
+
+	payload := []byte("TNC:KISS")
+	cmdPayload := WithCommand(FrameTypeSetHardware, payload)
+
+	writeErr := make(chan error, 1)
+	go func() {
+		n, err := sender.CommandPort(3).Write(cmdPayload)
+		if err != nil {
+			writeErr <- err
+			return
+		}
+		if n != len(cmdPayload) {
+			writeErr <- errors.New("short logical write")
+			return
+		}
+		writeErr <- nil
+	}()
+
+	readResult := make(chan []byte, 1)
+	readErr := make(chan error, 1)
+	go func() {
+		buf := make([]byte, 64)
+		n, err := receiver.CommandPort(3).Read(buf)
+		if err != nil {
+			readErr <- err
+			return
+		}
+		readResult <- append([]byte(nil), buf[:n]...)
+	}()
+
+	select {
+	case err := <-writeErr:
+		if err != nil {
+			t.Fatalf("write failed: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out writing SetHardware frame")
+	}
+
+	select {
+	case err := <-readErr:
+		t.Fatalf("read failed: %v", err)
+	case got := <-readResult:
+		if len(got) < 1+len(cmdPayload) {
+			t.Fatalf("decoded command frame too short: got %d bytes", len(got))
+		}
+		if got[0] != 0x36 {
+			t.Fatalf("decoded header = %#x, want %#x", got[0], byte(0x30|FrameTypeSetHardware))
+		}
+		if !bytes.Equal(got[1:1+len(cmdPayload)], cmdPayload) {
+			t.Fatalf("decoded payload = %#v, want %#v", got[1:1+len(cmdPayload)], cmdPayload)
+		}
+		for i, b := range got[1+len(cmdPayload):] {
+			if b != 0 {
+				t.Fatalf("padding byte %d = %#x, want 0", i, b)
+			}
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out reading SetHardware frame")
 	}
 }
 
