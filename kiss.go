@@ -155,7 +155,7 @@ func (t *TNC) enqueue(port uint8, data []byte) {
 		<-t.ports[port].queue
 	}
 
-	t.ports[port].queue <- data
+	t.ports[port].queue <- data[:]
 }
 
 // enqueueCommand appends a decoded command frame to the target command queue,
@@ -166,7 +166,7 @@ func (t *TNC) enqueueCommand(port uint8, data []byte) {
 		<-t.ports[port].cmdQueue
 	}
 
-	t.ports[port].cmdQueue <- data
+	t.ports[port].cmdQueue <- data[:]
 }
 
 // IsClosed reports whether the router goroutine has stopped and closed the data
