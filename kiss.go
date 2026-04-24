@@ -25,6 +25,11 @@ import (
 	"io"
 )
 
+var (
+	// ErrInvalidPort reports an out-of-range KISS port number.
+	ErrInvalidPort = errors.New("invalid port: must be 0-7")
+)
+
 const (
 	// QueueDepth is the number of frames buffered per receive queue before the
 	// oldest queued frame is discarded.
@@ -68,10 +73,11 @@ func Is(a, b Command) bool {
 	return a&0x0F == b&0x0F
 }
 
-var (
-	// ErrInvalidPort reports an out-of-range KISS port number.
-	ErrInvalidPort = errors.New("invalid port: must be 0-7")
-)
+// WithCommand returns a copy of payload prefixed with c. The copy is intentional
+// as typical use will be from a Read() buffer that may get overwritten.
+func WithCommand(c Command, payload []byte) []byte {
+	return append([]byte{byte(c & 0x0f)}, payload...)
+}
 
 // TODO: Add a slog logger that defaults to io.Discard;
 // Package function can change the destination.
