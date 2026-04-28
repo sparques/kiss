@@ -7,7 +7,9 @@
 //
 // Use Port to exchange ordinary data frames. Reads from a port return the frame
 // payload without the leading KISS header byte, and writes automatically encode
-// the selected port number with FrameTypeData.
+// the selected port number with FrameTypeData. (*TNC).Port() returns an
+// io.ReadWriter, with all kiss-related aspects stripped, making it easy to use
+// with other go functions/packages that expect an io.ReadWriter.
 //
 // Use CommandPort to exchange non-data KISS command frames such as TX delay or
 // slot time settings. CommandPort.Read returns the full decoded frame including
@@ -245,7 +247,8 @@ func (cp *commandPort) Read(data []byte) (n int, err error) {
 // is masked--you cannot write to a different port by specifying the port in
 // the first byte.
 func (cp *commandPort) Write(data []byte) (n int, err error) {
-	if len(data) == 0 {
+	// first byte is our Command Nybble. Not valid to only have a command nybble.
+	if len(data) <= 1 {
 		return 0, nil
 	}
 	frame := FrameEncode(cp.id<<4|(data[0]&0x0f), data[1:])
@@ -320,27 +323,27 @@ func Split(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	frame := make([]byte, 0, len(rawFrame))
 	i := 0
 	for i < len(rawFrame) {
-		if rawFrame[i] == FESC {
-			if i+1 >= len(rawFrame) {
-				// Incomplete escape sequence; wait for more data.
-				if atEOF {
-					return len(data), nil, errors.New("incomplete escape sequence")
-				}
-				return 0, nil, nil
-			}
-			switch rawFrame[i+1] {
-			case TFEND:
-				frame = append(frame, FEND)
-			case TFESC:
-				frame = append(frame, FESC)
-			default:
-				return len(data), nil, errors.New("invalid escape sequence")
-			}
-			i += 2
-		} else {
+		if rawFrame[i] != FESC {
 			frame = append(frame, rawFrame[i])
 			i++
+			continue
 		}
+		if i+1 >= len(rawFrame) {
+			// Incomplete escape sequence; wait for more data.
+			if atEOF {
+				return len(data), nil, errors.New("incomplete escape sequence")
+			}
+			return 0, nil, nil
+		}
+		switch rawFrame[i+1] {
+		case TFEND:
+			frame = append(frame, FEND)
+		case TFESC:
+			frame = append(frame, FESC)
+		default:
+			return len(data), nil, errors.New("invalid escape sequence")
+		}
+		i += 2
 	}
 
 	// Return the processed frame as the token.
