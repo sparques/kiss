@@ -208,7 +208,7 @@ func (p *port) Read(data []byte) (n int, err error) {
 // Write encodes data as a KISS data frame for this port and writes it to the
 // shared transport.
 func (p *port) Write(data []byte) (n int, err error) {
-	frame := FrameEncode(p.id<<4|(data[0]&0x0F), data[1:])
+	frame := FrameEncode(p.id<<4, data)
 	written, err := p.rw.Write(frame)
 	if err != nil {
 		return 0, err
@@ -248,7 +248,7 @@ func (cp *commandPort) Write(data []byte) (n int, err error) {
 	if len(data) == 0 {
 		return 0, nil
 	}
-	frame := FrameEncode(cp.id<<4|(data[0]&0x0f), data)
+	frame := FrameEncode(cp.id<<4|(data[0]&0x0f), data[1:])
 	written, err := cp.rw.Write(frame)
 	if err != nil {
 		return 0, err
