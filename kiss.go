@@ -208,7 +208,7 @@ func (p *port) Read(data []byte) (n int, err error) {
 // Write encodes data as a KISS data frame for this port and writes it to the
 // shared transport.
 func (p *port) Write(data []byte) (n int, err error) {
-	frame := FrameEncode(p.id<<4, data)
+	frame := FrameEncode(p.id<<4|(data[0]&0x0F), data[1:])
 	written, err := p.rw.Write(frame)
 	if err != nil {
 		return 0, err
